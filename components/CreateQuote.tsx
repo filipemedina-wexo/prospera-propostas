@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Calendar, Save, Trash2, Download } from 'lucide-react';
 import { formatCurrency } from './Formatters';
-import { ItemType, QuoteItem, PAYMENT_METHODS, Quote, Service } from '../types';
+import { ItemType, QuoteItem, Quote, Service, PaymentMethod } from '../types';
 import { generateShortId, saveQuote, getQuote } from '../services/quoteService';
 import { getAllServices } from '../services/servicesService';
+import { getAllPaymentMethods } from '../services/paymentService';
 import { useAuth } from './AuthProvider';
 
 const CreateQuote: React.FC = () => {
@@ -15,6 +16,7 @@ const CreateQuote: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [availableServices, setAvailableServices] = useState<Service[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 
   // Client State
   const [clientName, setClientName] = useState('');
@@ -34,13 +36,25 @@ const CreateQuote: React.FC = () => {
   const [newItemType, setNewItemType] = useState<ItemType>(ItemType.ONE_TIME);
 
   // Payment State
-  const [paymentMethodId, setPaymentMethodId] = useState(PAYMENT_METHODS[0].id);
+  const [paymentMethodId, setPaymentMethodId] = useState('');
 
-  // Load for Edit Mode
+  // Initial Load (Edit Mode & Resources)
   React.useEffect(() => {
-    if (id) {
+    const init = async () => {
       setLoading(true);
-      getQuote(id).then(quote => {
+
+      // Load Payment Methods first
+      const methods = await getAllPaymentMethods();
+      setPaymentMethods(methods);
+
+      // Set default if adding new
+      if (!id && methods.length > 0) {
+        setPaymentMethodId(methods[0].id);
+      }
+
+      // If editing, load quote
+      if (id) {
+        const quote = await getQuote(id);
         if (quote) {
           setClientName(quote.clientName);
           setClientEmail(quote.clientEmail || '');
@@ -50,9 +64,11 @@ const CreateQuote: React.FC = () => {
           setPaymentMethodId(quote.paymentMethodId);
           setCreatedAt(quote.createdAt);
         }
-        setLoading(false);
-      });
-    }
+      }
+      setLoading(false);
+    };
+
+    init();
   }, [id]);
 
   // Load Services for Modal
@@ -71,7 +87,7 @@ const CreateQuote: React.FC = () => {
     .filter(i => i.type === ItemType.RECURRING)
     .reduce((acc, curr) => acc + curr.amount, 0);
 
-  const selectedPayment = PAYMENT_METHODS.find(p => p.id === paymentMethodId);
+  const selectedPayment = paymentMethods.find(p => p.id === paymentMethodId);
   const discountAmount = selectedPayment ? (subtotalOneTime * selectedPayment.discountPercent) / 100 : 0;
   const totalOneTime = subtotalOneTime - discountAmount;
 
@@ -114,6 +130,10 @@ const CreateQuote: React.FC = () => {
     }
     if (items.length === 0) {
       alert('Adicione pelo menos um item ao orçamento.');
+      return;
+    }
+    if (!paymentMethodId) {
+      alert('Selecione uma forma de pagamento.');
       return;
     }
 
@@ -283,7 +303,8 @@ const CreateQuote: React.FC = () => {
               value={paymentMethodId}
               onChange={e => setPaymentMethodId(e.target.value)}
             >
-              {PAYMENT_METHODS.map(method => (
+              {paymentMethods.length === 0 && <option value="">Carregando...</option>}
+              {paymentMethods.map(method => (
                 <option key={method.id} value={method.id}>{method.name}</option>
               ))}
             </select>

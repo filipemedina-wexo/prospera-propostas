@@ -5,6 +5,7 @@ import CreateQuote from './components/CreateQuote';
 import ViewQuote from './components/ViewQuote';
 import ShareQuote from './components/ShareQuote';
 import ServicesPage from './components/ServicesPage';
+import PaymentMethodsPage from './components/PaymentMethodsPage';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import { AuthProvider, useAuth } from './components/AuthProvider';
@@ -49,6 +50,16 @@ const App: React.FC = () => {
             <Route path="/" element={
               <ProtectedRoute>
                 <Dashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/services" element={
+              <ProtectedRoute>
+                <ServicesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/payments" element={
+              <ProtectedRoute>
+                <PaymentMethodsPage />
               </ProtectedRoute>
             } />
             <Route path="/new" element={

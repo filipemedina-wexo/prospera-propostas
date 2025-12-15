@@ -14,6 +14,7 @@ export interface PaymentMethod {
   id: string;
   name: string;
   discountPercent: number;
+  active?: boolean;
 }
 
 export interface Service {
@@ -37,9 +38,3 @@ export interface Quote {
   status: 'DRAFT' | 'SENT' | 'APPROVED' | 'EXPIRED';
   userEmail?: string;
 }
-
-export const PAYMENT_METHODS: PaymentMethod[] = [
-  { id: 'pix', name: 'PIX (5% de desconto)', discountPercent: 5 },
-  { id: 'credit_card', name: 'Cartão de Crédito (Sem desconto)', discountPercent: 0 },
-  { id: 'boleto', name: 'Boleto Bancário (Sem desconto)', discountPercent: 0 },
-];

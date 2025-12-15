@@ -57,6 +57,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             >
               Serviços
             </Link>
+            <Link
+              to="/payments"
+              className="text-slate-600 hover:text-brand-600 text-sm font-medium transition-colors ml-4"
+              title="Formas de Pagamento"
+            >
+              Pagamentos
+            </Link>
             <div className="h-6 w-px bg-slate-300 mx-1"></div>
             <button
               onClick={handleLogout}

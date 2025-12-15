@@ -1,13 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Share2, Printer, Pencil, Building2, Calendar, Clock, CheckCircle2, Copy, ThumbsUp, X } from 'lucide-react';
-import { Quote, ItemType, PAYMENT_METHODS } from '../types';
+import { Quote, ItemType, PaymentMethod } from '../types';
 import { getQuote, updateQuoteStatus } from '../services/quoteService';
+import { getAllPaymentMethods } from '../services/paymentService';
 import { useAuth } from './AuthProvider';
 import { formatCurrency } from './Formatters';
 import PasswordGate from './PasswordGate';
 import { format, parseISO } from 'date-fns';
 import confetti from 'canvas-confetti';
+
+// Legacy methods for backward compatibility
+const LEGACY_METHODS: PaymentMethod[] = [
+  { id: 'pix', name: 'PIX (5% de desconto)', discountPercent: 5 },
+  { id: 'credit_card', name: 'Cartão de Crédito (Sem desconto)', discountPercent: 0 },
+  { id: 'boleto', name: 'Boleto Bancário (Sem desconto)', discountPercent: 0 },
+];
 
 const ViewQuote: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -16,6 +24,7 @@ const ViewQuote: React.FC = () => {
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [isAccepting, setIsAccepting] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
 
   const { user } = useAuth();
   const isAdmin = !!user;
@@ -29,12 +38,18 @@ const ViewQuote: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
-    if (id) {
-      getQuote(id).then(foundQuote => {
+    const loadData = async () => {
+      // Load methods
+      const methods = await getAllPaymentMethods();
+      setPaymentMethods(methods);
+
+      if (id) {
+        const foundQuote = await getQuote(id);
         setQuote(foundQuote);
-        setLoading(false);
-      });
-    }
+      }
+      setLoading(false);
+    };
+    loadData();
   }, [id]);
 
   if (!quote) {
@@ -55,7 +70,12 @@ const ViewQuote: React.FC = () => {
     .filter(i => i.type === ItemType.RECURRING)
     .reduce((acc, curr) => acc + curr.amount, 0);
 
-  const paymentMethod = PAYMENT_METHODS.find(p => p.id === quote.paymentMethodId) || PAYMENT_METHODS[1];
+  // Find method in DB or Legacy
+  const paymentMethod =
+    paymentMethods.find(p => p.id === quote.paymentMethodId) ||
+    LEGACY_METHODS.find(p => p.id === quote.paymentMethodId) ||
+    { id: 'unknown', name: 'Método não identificado', discountPercent: 0 };
+
   const discountAmount = (subtotalOneTime * paymentMethod.discountPercent) / 100;
   const totalOneTime = subtotalOneTime - discountAmount;
 
