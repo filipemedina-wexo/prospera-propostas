@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, ExternalLink, Copy, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, ExternalLink, Copy, CheckCircle2, Pencil } from 'lucide-react';
 import { getAllQuotes } from '../services/quoteService';
 import { Quote, ItemType } from '../types';
 import { formatCurrency } from './Formatters';
@@ -12,7 +12,11 @@ const Dashboard: React.FC = () => {
   const [copyId, setCopyId] = useState<string | null>(null);
 
   useEffect(() => {
-    setQuotes(getAllQuotes());
+    const fetchQuotes = async () => {
+      const data = await getAllQuotes();
+      setQuotes(data);
+    };
+    fetchQuotes();
   }, []);
 
   const handleCopyLink = (id: string) => {
@@ -22,8 +26,8 @@ const Dashboard: React.FC = () => {
     setTimeout(() => setCopyId(null), 2000);
   };
 
-  const filteredQuotes = quotes.filter(q => 
-    q.clientName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredQuotes = quotes.filter(q =>
+    q.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     q.id.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -37,7 +41,7 @@ const Dashboard: React.FC = () => {
   };
 
   const getStatusLabel = (status: string) => {
-     switch (status) {
+    switch (status) {
       case 'APPROVED': return 'Aprovado';
       case 'SENT': return 'Enviado'; // Usually we treat DRAFT as SENT in this simple flow
       case 'DRAFT': return 'Aguardando';
@@ -46,9 +50,7 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  const calculateTotal = (quote: Quote) => {
-    return quote.items.reduce((acc, item) => acc + item.amount, 0);
-  };
+
 
   return (
     <div className="animate-fade-in">
@@ -57,8 +59,8 @@ const Dashboard: React.FC = () => {
           <h1 className="text-3xl font-bold text-slate-900">Propostas Comerciais</h1>
           <p className="text-slate-500 mt-1">Gerencie todos os orçamentos enviados.</p>
         </div>
-        <Link 
-          to="/new" 
+        <Link
+          to="/new"
           className="bg-brand-500 hover:bg-brand-600 text-white px-6 py-3 rounded-xl shadow-lg shadow-brand-500/20 font-medium flex items-center gap-2 transition-all"
         >
           <Plus size={20} />
@@ -71,9 +73,9 @@ const Dashboard: React.FC = () => {
         <div className="p-4 border-b border-slate-100 flex gap-4 bg-slate-50/50">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-3 text-slate-400 w-5 h-5" />
-            <input 
-              type="text" 
-              placeholder="Buscar por cliente ou ID..." 
+            <input
+              type="text"
+              placeholder="Buscar por cliente ou ID..."
               className="w-full bg-white border border-slate-200 pl-10 pr-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -87,6 +89,7 @@ const Dashboard: React.FC = () => {
             <thead className="bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-100">
               <tr>
                 <th className="px-6 py-4">Cliente</th>
+                <th className="px-6 py-4">Responsável</th>
                 <th className="px-6 py-4">Valor Total</th>
                 <th className="px-6 py-4">Data</th>
                 <th className="px-6 py-4">Status</th>
@@ -107,15 +110,31 @@ const Dashboard: React.FC = () => {
                       <div className="font-medium text-slate-900">{quote.clientName}</div>
                       <div className="text-xs text-slate-400 font-mono mt-0.5">ID: {quote.id}</div>
                     </td>
+                    <td className="px-6 py-4 text-sm text-slate-600">
+                      {quote.userEmail || '-'}
+                    </td>
                     <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-700">
-                        {formatCurrency(calculateTotal(quote))}
-                      </div>
-                      {quote.items.some(i => i.type === ItemType.RECURRING) && (
-                        <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">
-                          Recorrente
-                        </span>
-                      )}
+                      {(() => {
+                        const fixedTotal = quote.items
+                          .filter(i => i.type === ItemType.ONE_TIME)
+                          .reduce((acc, i) => acc + i.amount, 0);
+                        const recurringTotal = quote.items
+                          .filter(i => i.type === ItemType.RECURRING)
+                          .reduce((acc, i) => acc + i.amount, 0);
+
+                        return (
+                          <div className="flex flex-col">
+                            {recurringTotal > 0 ? (
+                              <>
+                                <span className="font-semibold text-slate-900">{formatCurrency(fixedTotal)}</span>
+                                <span className="text-xs text-slate-500 font-medium">+ {formatCurrency(recurringTotal)}/mês</span>
+                              </>
+                            ) : (
+                              <span className="font-semibold text-slate-700">{formatCurrency(fixedTotal)}</span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-500">
                       {format(parseISO(quote.createdAt), 'dd/MM/yyyy')}
@@ -127,20 +146,29 @@ const Dashboard: React.FC = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                        <button 
+                        <button
                           onClick={() => handleCopyLink(quote.id)}
                           className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors relative group/tooltip"
                           title="Copiar Link"
                         >
                           {copyId === quote.id ? <CheckCircle2 size={18} className="text-green-600" /> : <Copy size={18} />}
                         </button>
-                        <Link 
+                        <Link
                           to={`/view/${quote.id}`}
                           className="p-2 hover:bg-slate-100 rounded-lg text-brand-600 transition-colors"
                           title="Visualizar"
                         >
                           <ExternalLink size={18} />
                         </Link>
+                        {quote.status !== 'APPROVED' && (
+                          <Link
+                            to={`/edit/${quote.id}`}
+                            className="p-2 hover:bg-slate-100 rounded-lg text-blue-600 transition-colors"
+                            title="Editar"
+                          >
+                            <Pencil size={18} />
+                          </Link>
+                        )}
                       </div>
                     </td>
                   </tr>

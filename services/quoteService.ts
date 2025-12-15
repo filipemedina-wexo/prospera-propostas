@@ -1,10 +1,8 @@
+import { supabase } from './supabaseClient';
 import { Quote } from '../types';
 
-const STORAGE_KEY = 'prospera_quotes';
-
-// Generate a random 6-character ID (Numbers and Uppercase Letters)
 export const generateShortId = (): string => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed similar looking chars like I, 1, O, 0
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let result = '';
   for (let i = 0; i < 6; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -12,39 +10,82 @@ export const generateShortId = (): string => {
   return result;
 };
 
-export const saveQuote = (quote: Quote): void => {
-  const existingJSON = localStorage.getItem(STORAGE_KEY);
-  const quotes: Record<string, Quote> = existingJSON ? JSON.parse(existingJSON) : {};
-  
-  quotes[quote.id] = quote;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(quotes));
-};
+// Mapper: DB -> App
+const mapFromDb = (data: any): Quote => ({
+  id: data.id,
+  clientName: data.client_name,
+  clientEmail: data.client_email,
+  createdAt: data.created_at,
+  updatedAt: data.updated_at,
+  validUntil: data.valid_until,
+  productionDays: data.production_days,
+  items: data.items,
+  paymentMethodId: data.payment_method_id,
+  status: data.status,
+  userEmail: data.user_email,
+});
 
-export const updateQuoteStatus = (id: string, status: Quote['status']): Quote | null => {
-  const existingJSON = localStorage.getItem(STORAGE_KEY);
-  if (!existingJSON) return null;
+// Mapper: App -> DB
+const mapToDb = (quote: Quote) => ({
+  id: quote.id,
+  client_name: quote.clientName,
+  client_email: quote.clientEmail,
+  created_at: quote.createdAt,
+  updated_at: new Date().toISOString(), // Always update this on save
+  valid_until: quote.validUntil,
+  production_days: quote.productionDays,
+  items: quote.items,
+  payment_method_id: quote.paymentMethodId,
+  status: quote.status,
+  user_email: quote.userEmail,
+});
 
-  const quotes: Record<string, Quote> = JSON.parse(existingJSON);
-  if (quotes[id]) {
-    quotes[id].status = status;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(quotes));
-    return quotes[id];
+export const saveQuote = async (quote: Quote): Promise<void> => {
+  const { error } = await supabase
+    .from('quotes')
+    .upsert(mapToDb(quote)); // Using upsert to handle both insert and update
+
+  if (error) {
+    console.error('Error saving quote:', error);
+    throw error;
   }
-  return null;
 };
 
-export const getQuote = (id: string): Quote | null => {
-  const existingJSON = localStorage.getItem(STORAGE_KEY);
-  if (!existingJSON) return null;
-  
-  const quotes: Record<string, Quote> = JSON.parse(existingJSON);
-  return quotes[id] || null;
+export const updateQuoteStatus = async (id: string, status: Quote['status']): Promise<Quote | null> => {
+  const { data, error } = await supabase
+    .from('quotes')
+    .update({ status })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating quote status:', error);
+    return null;
+  }
+  return mapFromDb(data);
 };
 
-export const getAllQuotes = (): Quote[] => {
-  const existingJSON = localStorage.getItem(STORAGE_KEY);
-  if (!existingJSON) return [];
-  
-  const quotes: Record<string, Quote> = JSON.parse(existingJSON);
-  return Object.values(quotes).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+export const getQuote = async (id: string): Promise<Quote | null> => {
+  const { data, error } = await supabase
+    .from('quotes')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error || !data) return null;
+  return mapFromDb(data);
+};
+
+export const getAllQuotes = async (): Promise<Quote[]> => {
+  const { data, error } = await supabase
+    .from('quotes')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching quotes:', error);
+    return [];
+  }
+  return data.map(mapFromDb);
 };

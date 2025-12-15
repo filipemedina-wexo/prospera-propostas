@@ -9,9 +9,9 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = login(email, password);
+    const user = await login(email, password);
     if (user) {
       navigate('/');
     } else {

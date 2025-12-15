@@ -1,25 +1,39 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Share2, Printer, Pencil, Building2, Calendar, Clock, CheckCircle2, Copy, ThumbsUp } from 'lucide-react';
+import { Share2, Printer, Pencil, Building2, Calendar, Clock, CheckCircle2, Copy, ThumbsUp, X } from 'lucide-react';
 import { Quote, ItemType, PAYMENT_METHODS } from '../types';
 import { getQuote, updateQuoteStatus } from '../services/quoteService';
-import { isAuthenticated as isAdminAuthenticated } from '../services/authService';
+import { useAuth } from './AuthProvider';
 import { formatCurrency } from './Formatters';
 import PasswordGate from './PasswordGate';
 import { format, parseISO } from 'date-fns';
+import confetti from 'canvas-confetti';
 
 const ViewQuote: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [quote, setQuote] = useState<Quote | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isGateOpen, setIsGateOpen] = useState(false); // Renamed to avoid confusion
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [isAccepting, setIsAccepting] = useState(false);
-  const isAdmin = isAdminAuthenticated();
+  const [showModal, setShowModal] = useState(false);
+
+  const { user } = useAuth();
+  const isAdmin = !!user;
+  const [loading, setLoading] = useState(true);
+
+  // Auto-open gate for logged in users
+  useEffect(() => {
+    if (user) {
+      setIsGateOpen(true);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (id) {
-      const foundQuote = getQuote(id);
-      setQuote(foundQuote);
+      getQuote(id).then(foundQuote => {
+        setQuote(foundQuote);
+        setLoading(false);
+      });
     }
   }, [id]);
 
@@ -28,8 +42,8 @@ const ViewQuote: React.FC = () => {
   }
 
   // Gate check
-  if (!isAuthenticated) {
-    return <PasswordGate onSuccess={() => setIsAuthenticated(true)} />;
+  if (!isGateOpen) {
+    return <PasswordGate onSuccess={() => setIsGateOpen(true)} />;
   }
 
   // Calculations
@@ -57,20 +71,29 @@ const ViewQuote: React.FC = () => {
     });
   };
 
-  const handleAcceptQuote = () => {
-    if (!window.confirm('Deseja confirmar o aceite desta proposta? Essa ação notificará a equipe da Prospera.')) {
-      return;
-    }
-    
+
+  const handleAcceptClick = () => {
+    setShowModal(true);
+  };
+
+  const handleConfirmAccept = async () => {
     setIsAccepting(true);
-    // Simulate network delay for effect
-    setTimeout(() => {
-      if (quote) {
-        const updated = updateQuoteStatus(quote.id, 'APPROVED');
-        if (updated) setQuote(updated);
-      }
-      setIsAccepting(false);
-    }, 800);
+
+    // Trigger Confetti
+    confetti({
+      particleCount: 150,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ['#10b981', '#34d399', '#f59e0b', '#fbbf24']
+    });
+
+    if (quote) {
+      const updated = await updateQuoteStatus(quote.id, 'APPROVED');
+      if (updated) setQuote(updated);
+    }
+
+    setIsAccepting(false);
+    setShowModal(false);
   };
 
   return (
@@ -86,7 +109,7 @@ const ViewQuote: React.FC = () => {
           </div>
           <h1 className="text-3xl font-bold text-slate-900">Detalhes do Orçamento</h1>
         </div>
-        
+
         <div className="flex gap-3">
           {isAdmin && (
             <Link to="/" className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors flex items-center gap-2">
@@ -94,14 +117,14 @@ const ViewQuote: React.FC = () => {
               Voltar ao Painel
             </Link>
           )}
-          <button 
+          <button
             onClick={handleShare}
             className="bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors flex items-center gap-2 relative"
           >
             {copyFeedback ? <CheckCircle2 size={16} className="text-green-500" /> : <Share2 size={16} />}
             {copyFeedback ? 'Link Copiado!' : 'Compartilhar'}
           </button>
-          <button 
+          <button
             onClick={handlePrint}
             className="bg-brand-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-600 transition-colors flex items-center gap-2 shadow-sm"
           >
@@ -113,7 +136,7 @@ const ViewQuote: React.FC = () => {
 
       {/* Main Content Card */}
       <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 overflow-hidden border border-white">
-        
+
         {/* Blue Line Top */}
         <div className={`h-2 w-full ${quote.status === 'APPROVED' ? 'bg-green-500' : 'bg-gradient-to-r from-blue-400 to-brand-400'}`}></div>
 
@@ -131,7 +154,7 @@ const ViewQuote: React.FC = () => {
               </div>
             </div>
           )}
-          
+
           {/* Header Info */}
           <div className="flex flex-col md:flex-row justify-between mb-12 gap-8">
             <div>
@@ -147,6 +170,9 @@ const ViewQuote: React.FC = () => {
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase">Data</p>
                 <p className="font-semibold text-slate-700">{format(parseISO(quote.createdAt), 'dd/MM/yyyy')}</p>
+                {quote.updatedAt && quote.updatedAt !== quote.createdAt && (
+                  <p className="text-[10px] text-slate-400 mt-1">Atualizado: {format(parseISO(quote.updatedAt), 'dd/MM HH:mm')}</p>
+                )}
               </div>
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase">Validade</p>
@@ -155,8 +181,8 @@ const ViewQuote: React.FC = () => {
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase">Prazo</p>
                 <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
-                   <Clock size={14} className="text-brand-500" />
-                   {quote.productionDays} dias úteis
+                  <Clock size={14} className="text-brand-500" />
+                  {quote.productionDays} dias úteis
                 </div>
               </div>
               <div>
@@ -172,7 +198,7 @@ const ViewQuote: React.FC = () => {
           <div className="mb-12">
             <div className="flex items-center gap-2 mb-6 text-slate-900 font-bold text-lg">
               <div className="w-8 h-8 rounded bg-brand-100 text-brand-600 flex items-center justify-center">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>
               </div>
               Itens do Projeto
             </div>
@@ -211,7 +237,7 @@ const ViewQuote: React.FC = () => {
 
           {/* Footer Section: Payment & Totals */}
           <div className="flex flex-col lg:flex-row gap-12">
-            
+
             {/* Payment Method */}
             <div className="flex-1">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Método de Pagamento</h3>
@@ -220,15 +246,15 @@ const ViewQuote: React.FC = () => {
                   <Building2 size={24} />
                 </div>
                 <div>
-                   <p className="font-bold text-slate-800">{paymentMethod.name.split('(')[0]}</p>
-                   <p className="text-brand-600 text-sm font-medium">{paymentMethod.discountPercent > 0 ? `${paymentMethod.discountPercent}% de desconto aplicado` : 'Sem desconto adicional'}</p>
+                  <p className="font-bold text-slate-800">{paymentMethod.name.split('(')[0]}</p>
+                  <p className="text-brand-600 text-sm font-medium">{paymentMethod.discountPercent > 0 ? `${paymentMethod.discountPercent}% de desconto aplicado` : 'Sem desconto adicional'}</p>
                 </div>
               </div>
 
               <div className="mt-8">
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Observações</h3>
                 <p className="text-slate-500 text-sm leading-relaxed">
-                  O início do projeto se dá após a confirmação do pagamento da primeira parcela (ou valor integral). 
+                  O início do projeto se dá após a confirmação do pagamento da primeira parcela (ou valor integral).
                   Valores de recorrência serão cobrados via boleto bancário mensalmente.
                 </p>
               </div>
@@ -258,8 +284,8 @@ const ViewQuote: React.FC = () => {
 
                 <div className="border-t border-slate-200 pt-6">
                   <div className="flex justify-between items-end mb-1">
-                      <span className="font-bold text-slate-900 text-lg">Total do Pedido</span>
-                      <span className="font-bold text-slate-900 text-3xl">{formatCurrency(totalOneTime + subtotalRecurring)}</span>
+                    <span className="font-bold text-slate-900 text-lg">Total do Pedido</span>
+                    <span className="font-bold text-slate-900 text-3xl">{formatCurrency(totalOneTime + subtotalRecurring)}</span>
                   </div>
                   {subtotalRecurring > 0 && (
                     <p className="text-right text-slate-500 text-sm">+ {formatCurrency(subtotalRecurring)} /mês</p>
@@ -269,30 +295,62 @@ const ViewQuote: React.FC = () => {
 
               {/* ACTION BUTTON FOR CLIENT */}
               {quote.status !== 'APPROVED' && (
-                <button 
-                  onClick={handleAcceptQuote}
+                <button
+                  onClick={handleAcceptClick}
                   disabled={isAccepting}
                   className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 transition-all transform hover:scale-[1.02] flex justify-center items-center gap-2 no-print"
                 >
-                  {isAccepting ? (
-                    'Processando...'
-                  ) : (
-                    <>
-                      <ThumbsUp size={20} /> Aprovar Orçamento
-                    </>
-                  )}
+                  <ThumbsUp size={20} /> Aprovar Orçamento
                 </button>
               )}
             </div>
           </div>
         </div>
       </div>
-      
+
       {/* Verify Footer */}
       <div className="text-center mt-8 text-slate-400 text-sm flex items-center justify-center gap-2 print-break">
         <CheckCircle2 size={16} className="text-slate-300" />
         Documento gerado digitalmente pela plataforma Prospera.
       </div>
+
+      {/* Confirmation Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all scale-100">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-slate-900">Confirmar Aprovação</h3>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mb-8 text-center py-4">
+              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 size={32} />
+              </div>
+              <p className="text-lg font-medium text-slate-700">Você deseja confirmar esse trabalho?</p>
+              <p className="text-sm text-slate-500 mt-2">Ao confirmar, a equipe da Prospera será notificada para iniciar o projeto.</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowModal(false)}
+                className="flex-1 bg-white border border-slate-200 text-slate-700 font-semibold py-3 rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmAccept}
+                disabled={isAccepting}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-green-600/20 transition-all flex justify-center items-center gap-2"
+              >
+                {isAccepting ? 'Confirmando...' : 'Confirmar Aprovação'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

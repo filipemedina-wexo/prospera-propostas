@@ -16,16 +16,26 @@ export interface PaymentMethod {
   discountPercent: number;
 }
 
+export interface Service {
+  id: string;
+  description: string;
+  amount: number;
+  type: ItemType;
+  userEmail?: string;
+}
+
 export interface Quote {
   id: string;
   clientName: string;
   clientEmail?: string;
   createdAt: string; // ISO date string
+  updatedAt?: string; // ISO date string
   validUntil: string; // ISO date string
   productionDays: number;
   items: QuoteItem[];
   paymentMethodId: string;
   status: 'DRAFT' | 'SENT' | 'APPROVED' | 'EXPIRED';
+  userEmail?: string;
 }
 
 export const PAYMENT_METHODS: PaymentMethod[] = [

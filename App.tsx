@@ -3,9 +3,11 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import CreateQuote from './components/CreateQuote';
 import ViewQuote from './components/ViewQuote';
+import ShareQuote from './components/ShareQuote';
+import ServicesPage from './components/ServicesPage';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
-import { isAuthenticated } from './services/authService';
+import { AuthProvider, useAuth } from './components/AuthProvider';
 
 // Global Fade Animation
 const GlobalStyles = () => (
@@ -22,7 +24,13 @@ const GlobalStyles = () => (
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
-  if (!isAuthenticated()) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center text-slate-400">Carregando...</div>;
+  }
+
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
   return <>{children}</>;
@@ -30,13 +38,13 @@ const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
 
 const App: React.FC = () => {
   return (
-    <>
+    <AuthProvider>
       <GlobalStyles />
       <HashRouter>
         <Layout>
           <Routes>
             <Route path="/login" element={<Login />} />
-            
+
             {/* Protected Routes */}
             <Route path="/" element={
               <ProtectedRoute>
@@ -48,15 +56,25 @@ const App: React.FC = () => {
                 <CreateQuote />
               </ProtectedRoute>
             } />
+            <Route path="/edit/:id" element={
+              <ProtectedRoute>
+                <CreateQuote />
+              </ProtectedRoute>
+            } />
+            <Route path="/share/:id" element={
+              <ProtectedRoute>
+                <ShareQuote />
+              </ProtectedRoute>
+            } />
 
             {/* Public Routes (with internal PasswordGate) */}
             <Route path="/view/:id" element={<ViewQuote />} />
-            
+
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Layout>
       </HashRouter>
-    </>
+    </AuthProvider>
   );
 };
 
