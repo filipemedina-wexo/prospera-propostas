@@ -305,7 +305,7 @@ const ViewQuote: React.FC = () => {
                 <div className="border-t border-slate-200 pt-6">
                   <div className="flex justify-between items-end mb-1">
                     <span className="font-bold text-slate-900 text-lg">Total do Pedido</span>
-                    <span className="font-bold text-slate-900 text-3xl">{formatCurrency(totalOneTime + subtotalRecurring)}</span>
+                    <span className="font-bold text-slate-900 text-3xl">{formatCurrency(totalOneTime)}</span>
                   </div>
                   {subtotalRecurring > 0 && (
                     <p className="text-right text-slate-500 text-sm">+ {formatCurrency(subtotalRecurring)} /mês</p>
