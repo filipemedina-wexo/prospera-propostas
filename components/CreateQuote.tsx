@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Calendar, Save, Trash2, Download } from 'lucide-react';
 import { formatCurrency } from './Formatters';
-import { ItemType, QuoteItem, Quote, Service, PaymentMethod } from '../types';
+import { ItemType, QuoteItem, Quote, Service, PaymentMethod, PaymentOption } from '../types';
 import { generateShortId, saveQuote, getQuote } from '../services/quoteService';
 import { getAllServices } from '../services/servicesService';
 import { getAllPaymentMethods } from '../services/paymentService';
@@ -36,7 +36,7 @@ const CreateQuote: React.FC = () => {
   const [newItemType, setNewItemType] = useState<ItemType>(ItemType.ONE_TIME);
 
   // Payment State
-  const [paymentMethodId, setPaymentMethodId] = useState('');
+  const [paymentOptions, setPaymentOptions] = useState<PaymentOption[]>([]);
 
   // Initial Load (Edit Mode & Resources)
   React.useEffect(() => {
@@ -47,10 +47,6 @@ const CreateQuote: React.FC = () => {
       const methods = await getAllPaymentMethods();
       setPaymentMethods(methods);
 
-      // Set default if adding new
-      if (!id && methods.length > 0) {
-        setPaymentMethodId(methods[0].id);
-      }
 
       // If editing, load quote
       if (id) {
@@ -61,9 +57,29 @@ const CreateQuote: React.FC = () => {
           setProductionDays(quote.productionDays);
           setValidUntil(quote.validUntil.split('T')[0]);
           setItems(quote.items);
-          setPaymentMethodId(quote.paymentMethodId);
+          if (quote.paymentOptions && quote.paymentOptions.length > 0) {
+            setPaymentOptions(quote.paymentOptions);
+          } else if (quote.paymentMethodId) {
+            // Migration
+            const method = methods.find(m => m.id === quote.paymentMethodId);
+            setPaymentOptions([{
+              id: Math.random().toString(36).substr(2, 9),
+              paymentMethodId: quote.paymentMethodId,
+              installments: quote.installments || 1,
+              hasDownPayment: quote.hasDownPayment || false,
+              discountPercent: method?.discountPercent || 0
+            }]);
+          }
           setCreatedAt(quote.createdAt);
         }
+      } else if (methods.length > 0) {
+        setPaymentOptions([{
+          id: Math.random().toString(36).substr(2, 9),
+          paymentMethodId: methods[0].id,
+          installments: 1,
+          hasDownPayment: false,
+          discountPercent: methods[0].discountPercent
+        }]);
       }
       setLoading(false);
     };
@@ -87,8 +103,8 @@ const CreateQuote: React.FC = () => {
     .filter(i => i.type === ItemType.RECURRING)
     .reduce((acc, curr) => acc + curr.amount, 0);
 
-  const selectedPayment = paymentMethods.find(p => p.id === paymentMethodId);
-  const discountAmount = selectedPayment ? (subtotalOneTime * selectedPayment.discountPercent) / 100 : 0;
+  const selectedPayment = paymentMethods.find(p => p.id === (paymentOptions[0]?.paymentMethodId || ''));
+  const discountAmount = selectedPayment ? (subtotalOneTime * (paymentOptions[0]?.discountPercent ?? selectedPayment.discountPercent)) / 100 : 0;
   const totalOneTime = subtotalOneTime - discountAmount;
 
   const addItem = () => {
@@ -132,8 +148,8 @@ const CreateQuote: React.FC = () => {
       alert('Adicione pelo menos um item ao orçamento.');
       return;
     }
-    if (!paymentMethodId) {
-      alert('Selecione uma forma de pagamento.');
+    if (paymentOptions.length === 0) {
+      alert('Adicione pelo menos uma forma de pagamento.');
       return;
     }
 
@@ -145,7 +161,10 @@ const CreateQuote: React.FC = () => {
       validUntil,
       productionDays,
       items,
-      paymentMethodId,
+      paymentMethodId: paymentOptions[0]?.paymentMethodId || '', // Legacy support
+      installments: paymentOptions[0]?.installments || 1, // Legacy support
+      hasDownPayment: paymentOptions[0]?.hasDownPayment || false, // Legacy support
+      paymentOptions,
       status: isDraft ? 'DRAFT' : 'SENT', // Use DRAFT if requested
       userEmail: user?.email
     };
@@ -298,16 +317,120 @@ const CreateQuote: React.FC = () => {
               <span className="text-brand-500">💳</span>
               <h2>Condições de Pagamento</h2>
             </div>
-            <select
-              className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all appearance-none"
-              value={paymentMethodId}
-              onChange={e => setPaymentMethodId(e.target.value)}
-            >
-              {paymentMethods.length === 0 && <option value="">Carregando...</option>}
-              {paymentMethods.map(method => (
-                <option key={method.id} value={method.id}>{method.name}</option>
+            <div className="space-y-6">
+              {paymentOptions.map((option, index) => (
+                <div key={option.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 relative group/option">
+                  <button
+                    onClick={() => setPaymentOptions(paymentOptions.filter(o => o.id !== option.id))}
+                    className="absolute -right-2 -top-2 bg-white border border-slate-200 text-red-500 p-1.5 rounded-full shadow-sm opacity-0 group-hover/option:opacity-100 transition-opacity z-10"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Método</label>
+                      <select
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500"
+                        value={option.paymentMethodId}
+                        onChange={e => {
+                          const newMethods = [...paymentOptions];
+                          newMethods[index].paymentMethodId = e.target.value;
+                          const method = paymentMethods.find(m => m.id === e.target.value);
+                          if (method) newMethods[index].discountPercent = method.discountPercent;
+                          setPaymentOptions(newMethods);
+                        }}
+                      >
+                        {paymentMethods.map(method => (
+                          <option key={method.id} value={method.id}>{method.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Desconto (%)</label>
+                      <input
+                        type="number"
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500"
+                        value={option.discountPercent}
+                        onChange={e => {
+                          const newMethods = [...paymentOptions];
+                          newMethods[index].discountPercent = parseFloat(e.target.value) || 0;
+                          setPaymentOptions(newMethods);
+                        }}
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Parcelamento</label>
+                      <select
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500"
+                        value={option.installments}
+                        onChange={e => {
+                          const newMethods = [...paymentOptions];
+                          newMethods[index].installments = parseInt(e.target.value);
+                          setPaymentOptions(newMethods);
+                        }}
+                      >
+                        {[1, 2, 3, 4, 5, 6, 10, 12].map(n => (
+                          <option key={n} value={n}>{n === 1 ? 'À vista' : `${n}x`}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newMethods = [...paymentOptions];
+                          newMethods[index].hasDownPayment = !newMethods[index].hasDownPayment;
+                          setPaymentOptions(newMethods);
+                        }}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all w-full ${option.hasDownPayment ? 'bg-brand-50 border-brand-200 text-brand-700' : 'bg-white border-slate-200 text-slate-500'}`}
+                      >
+                        <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${option.hasDownPayment ? 'bg-brand-500 border-brand-500' : 'bg-white border-slate-300'}`}>
+                          {option.hasDownPayment && <div className="w-1 h-1 bg-white rounded-full"></div>}
+                        </div>
+                        <span className="text-xs font-medium">Com Entrada</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {option.installments > 1 && (
+                    <div className="mt-3 pt-3 border-t border-slate-200 border-dashed">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase flex justify-between">
+                        <span>Preview do Pagamento ({option.discountPercent}% desc.)</span>
+                        <span className="text-brand-600">Total: {formatCurrency(subtotalOneTime * (1 - option.discountPercent / 100))}</span>
+                      </p>
+                      <div className="mt-1 text-xs text-slate-600">
+                        {option.hasDownPayment
+                          ? `Ato: ${formatCurrency((subtotalOneTime * (1 - option.discountPercent / 100)) / option.installments)} + ${option.installments - 1}x de ${formatCurrency((subtotalOneTime * (1 - option.discountPercent / 100)) / option.installments)}`
+                          : `${option.installments}x de ${formatCurrency((subtotalOneTime * (1 - option.discountPercent / 100)) / option.installments)}`
+                        }
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))}
-            </select>
+
+              <button
+                onClick={() => {
+                  if (paymentMethods.length === 0) return;
+                  setPaymentOptions([...paymentOptions, {
+                    id: Math.random().toString(36).substr(2, 9),
+                    paymentMethodId: paymentMethods[0].id,
+                    installments: 1,
+                    hasDownPayment: false,
+                    discountPercent: paymentMethods[0].discountPercent
+                  }]);
+                }}
+                className="w-full py-3 border-2 border-dashed border-slate-200 rounded-xl text-slate-400 hover:text-brand-500 hover:border-brand-500 hover:bg-brand-50 transition-all flex items-center justify-center gap-2 font-medium"
+              >
+                <Plus size={16} />
+                Adicionar Opção de Pagamento
+              </button>
+            </div>
           </div>
 
         </div>
@@ -370,7 +493,7 @@ const CreateQuote: React.FC = () => {
                 onClick={() => handleSave(false)}
                 className="w-full bg-brand-500 hover:bg-brand-600 text-white font-medium py-3 rounded-xl shadow-lg shadow-brand-500/20 transition-all transform hover:translate-y-[-1px] flex justify-center items-center gap-2"
               >
-                Gerar Proposta PDF <span className="text-lg">→</span>
+                Gerar proposta <span className="text-lg">→</span>
               </button>
               <button
                 onClick={() => handleSave(true)}

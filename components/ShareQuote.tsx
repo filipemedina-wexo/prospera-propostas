@@ -7,7 +7,7 @@ const ShareQuote: React.FC = () => {
     const [copied, setCopied] = useState(false);
 
     const shareUrl = `${window.location.protocol}//${window.location.host}/#/view/${id}`;
-    const password = "admin"; // Default password as per current authService logic
+    const password = "boraprosperar"; // Default password as per current authService logic
 
     const fullMessage = `Olá! Segue o link da sua proposta comercial:\n\n${shareUrl}\n\nSenha de acesso: ${password}`;
 

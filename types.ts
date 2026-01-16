@@ -17,6 +17,14 @@ export interface PaymentMethod {
   active?: boolean;
 }
 
+export interface PaymentOption {
+  id: string;
+  paymentMethodId: string;
+  installments: number;
+  hasDownPayment: boolean;
+  discountPercent: number;
+}
+
 export interface Service {
   id: string;
   description: string;
@@ -35,6 +43,10 @@ export interface Quote {
   productionDays: number;
   items: QuoteItem[];
   paymentMethodId: string;
+  installments?: number;
+  hasDownPayment?: boolean;
+  paymentOptions?: PaymentOption[];
+  selectedPaymentOptionId?: string;
   status: 'DRAFT' | 'SENT' | 'APPROVED' | 'EXPIRED';
   userEmail?: string;
 }

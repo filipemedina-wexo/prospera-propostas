@@ -21,6 +21,10 @@ const mapFromDb = (data: any): Quote => ({
   productionDays: data.production_days,
   items: data.items,
   paymentMethodId: data.payment_method_id,
+  installments: data.installments,
+  hasDownPayment: data.has_down_payment,
+  paymentOptions: data.payment_options,
+  selectedPaymentOptionId: data.selected_payment_option_id,
   status: data.status,
   userEmail: data.user_email,
 });
@@ -36,6 +40,10 @@ const mapToDb = (quote: Quote) => ({
   production_days: quote.productionDays,
   items: quote.items,
   payment_method_id: quote.paymentMethodId,
+  installments: quote.installments,
+  has_down_payment: quote.hasDownPayment,
+  payment_options: quote.paymentOptions,
+  selected_payment_option_id: quote.selectedPaymentOptionId,
   status: quote.status,
   user_email: quote.userEmail,
 });
@@ -51,10 +59,10 @@ export const saveQuote = async (quote: Quote): Promise<void> => {
   }
 };
 
-export const updateQuoteStatus = async (id: string, status: Quote['status']): Promise<Quote | null> => {
+export const updateQuoteStatus = async (id: string, status: Quote['status'], selectedPaymentOptionId?: string): Promise<Quote | null> => {
   const { data, error } = await supabase
     .from('quotes')
-    .update({ status })
+    .update({ status, selected_payment_option_id: selectedPaymentOptionId })
     .eq('id', id)
     .select()
     .single();
