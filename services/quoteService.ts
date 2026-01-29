@@ -15,6 +15,9 @@ const mapFromDb = (data: any): Quote => ({
   id: data.id,
   clientName: data.client_name,
   clientEmail: data.client_email,
+  serviceDescription: data.service_description,
+  layoutType: data.layout_type || 'PREMIUM', // Default to PREMIUM for existing quotes
+  content: data.content_data || {},
   createdAt: data.created_at,
   updatedAt: data.updated_at,
   validUntil: data.valid_until,
@@ -34,6 +37,9 @@ const mapToDb = (quote: Quote) => ({
   id: quote.id,
   client_name: quote.clientName,
   client_email: quote.clientEmail,
+  service_description: quote.serviceDescription,
+  layout_type: quote.layoutType,
+  content_data: quote.content,
   created_at: quote.createdAt,
   updated_at: new Date().toISOString(), // Always update this on save
   valid_until: quote.validUntil,

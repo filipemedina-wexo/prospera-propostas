@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Calendar, Save, Trash2, Download } from 'lucide-react';
 import { formatCurrency } from './Formatters';
-import { ItemType, QuoteItem, Quote, Service, PaymentMethod, PaymentOption } from '../types';
+import { ItemType, QuoteItem, Quote, Service, PaymentMethod, PaymentOption, LayoutType, QuoteContent } from '../types';
 import { generateShortId, saveQuote, getQuote } from '../services/quoteService';
 import { getAllServices } from '../services/servicesService';
 import { getAllPaymentMethods } from '../services/paymentService';
@@ -21,10 +21,26 @@ const CreateQuote: React.FC = () => {
   // Client State
   const [clientName, setClientName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
+  const [serviceDescription, setServiceDescription] = useState('');
   const [productionDays, setProductionDays] = useState<number>(15);
   const [validUntil, setValidUntil] = useState<string>(
     new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
+  const [layoutType, setLayoutType] = useState<LayoutType>('PREMIUM');
+  const [content, setContent] = useState<QuoteContent>({
+    briefing: { title: 'Proposta & Briefing Inicial', text: '' },
+    timeline: [
+      { id: '1', step: 1, title: 'Briefing', description: 'Envio e análise das informações iniciais', duration: '2 dias' },
+      { id: '2', step: 2, title: 'Primeira Prévia', description: 'Apresentação do conceito visual', duration: '5 dias' },
+      { id: '3', step: 3, title: 'Refinamento', description: 'Ajustes baseados no feedback', duration: '3 dias' },
+      { id: '4', step: 4, title: 'Entrega Final', description: 'Publicação e entrega dos acessos', duration: '1 dia' },
+    ],
+    features: [
+      { id: '1', title: 'Design Premium', description: 'Identidade visual única e sofisticada.' },
+      { id: '2', title: 'Responsividade Total', description: 'Site perfeito em celulares e tablets.' },
+      { id: '3', title: 'SEO Otimizado', description: 'Melhor posicionamento no Google.' },
+    ]
+  });
 
   // Date tracking for editing
   const [createdAt, setCreatedAt] = useState<string | null>(null);
@@ -54,6 +70,12 @@ const CreateQuote: React.FC = () => {
         if (quote) {
           setClientName(quote.clientName);
           setClientEmail(quote.clientEmail || '');
+          setServiceDescription(quote.serviceDescription || '');
+          setLayoutType(quote.layoutType || 'PREMIUM');
+          if (quote.content) {
+            // Merge default values with loaded content to ensure structure exists
+            setContent(prev => ({ ...prev, ...quote.content }));
+          }
           setProductionDays(quote.productionDays);
           setValidUntil(quote.validUntil.split('T')[0]);
           setItems(quote.items);
@@ -157,6 +179,9 @@ const CreateQuote: React.FC = () => {
       id: id || generateShortId(), // Keep existing ID if editing
       clientName,
       clientEmail,
+      serviceDescription,
+      layoutType,
+      content,
       createdAt: createdAt || new Date().toISOString(), // Keep original creation date
       validUntil,
       productionDays,
@@ -193,6 +218,43 @@ const CreateQuote: React.FC = () => {
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Left Column: Inputs */}
         <div className="flex-1 space-y-6">
+
+          {/* Layout Selection */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <div className="flex items-center gap-2 mb-4 text-slate-800 font-semibold">
+              <span className="text-brand-500">🎨</span>
+              <h2>Layout da Proposta</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => setLayoutType('SIMPLE')}
+                className={`p-4 rounded-xl border-2 transition-all text-left flex items-start gap-3 ${layoutType === 'SIMPLE' ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'}`}
+              >
+                <div className={`mt-1 w-4 h-4 rounded-full border-2 flex items-center justify-center ${layoutType === 'SIMPLE' ? 'border-brand-500' : 'border-slate-300'}`}>
+                  {layoutType === 'SIMPLE' && <div className="w-2 h-2 rounded-full bg-brand-500" />}
+                </div>
+                <div>
+                  <h3 className={`font-bold ${layoutType === 'SIMPLE' ? 'text-brand-700' : 'text-slate-700'}`}>Simples</h3>
+                  <p className="text-xs text-slate-500 mt-1">Layout clássico em tabela. Ideal para orçamentos rápidos e diretos.</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLayoutType('PREMIUM')}
+                className={`p-4 rounded-xl border-2 transition-all text-left flex items-start gap-3 ${layoutType === 'PREMIUM' ? 'border-brand-500 bg-brand-50/50' : 'border-slate-200 hover:border-slate-300'}`}
+              >
+                <div className={`mt-1 w-4 h-4 rounded-full border-2 flex items-center justify-center ${layoutType === 'PREMIUM' ? 'border-brand-500' : 'border-slate-300'}`}>
+                  {layoutType === 'PREMIUM' && <div className="w-2 h-2 rounded-full bg-brand-500" />}
+                </div>
+                <div>
+                  <h3 className={`font-bold ${layoutType === 'PREMIUM' ? 'text-brand-700' : 'text-slate-700'}`}>Completa</h3>
+                  <p className="text-xs text-slate-500 mt-1">Layout completo com descrição detalhada, timeline e apresentação visual premium.</p>
+                </div>
+              </button>
+            </div>
+          </div>
 
           {/* Client Data Card */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
@@ -249,6 +311,147 @@ const CreateQuote: React.FC = () => {
                   </div>
                 </div>
               </div>
+              {layoutType === 'PREMIUM' && (
+                <>
+                  <div className="mt-4">
+                    <label className="block text-sm font-medium text-slate-600 mb-1">Descrição / Escopo do Serviço</label>
+                    <textarea
+                      placeholder="Descreva detalhadamente o objetivo do projeto, escopo e entregáveis..."
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all min-h-[100px]"
+                      value={serviceDescription}
+                      onChange={e => setServiceDescription(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Features Editor */}
+                  <div className="mt-6 pt-6 border-t border-slate-100 animate-fade-in">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Destaques do Projeto</h3>
+                      <button
+                        type="button"
+                        onClick={() => setContent(prev => ({
+                          ...prev,
+                          features: [...(prev.features || []), { id: Math.random().toString(), title: 'Novo Destaque', description: 'Descrição do diferencial' }]
+                        }))}
+                        className="text-xs text-brand-600 font-bold hover:text-brand-800 flex items-center gap-1"
+                      >
+                        <Plus size={14} /> Adicionar
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {content.features?.map((feature, index) => (
+                        <div key={feature.id} className="p-3 bg-slate-50 border border-slate-200 rounded-lg relative group">
+                          <button
+                            type="button"
+                            onClick={() => setContent(prev => ({
+                              ...prev,
+                              features: prev.features?.filter(f => f.id !== feature.id)
+                            }))}
+                            className="absolute top-2 right-2 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                          <input
+                            type="text"
+                            className="block w-full bg-transparent font-bold text-slate-800 text-sm mb-1 focus:outline-none focus:border-b border-brand-300"
+                            value={feature.title}
+                            onChange={e => {
+                              const newFeatures = [...(content.features || [])];
+                              newFeatures[index].title = e.target.value;
+                              setContent({ ...content, features: newFeatures });
+                            }}
+                          />
+                          <textarea
+                            className="block w-full bg-transparent text-xs text-slate-500 focus:outline-none focus:border-b border-brand-300 resize-none"
+                            rows={2}
+                            value={feature.description}
+                            onChange={e => {
+                              const newFeatures = [...(content.features || [])];
+                              newFeatures[index].description = e.target.value;
+                              setContent({ ...content, features: newFeatures });
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Timeline Editor */}
+                  <div className="mt-6 pt-6 border-t border-slate-100 animate-fade-in">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Cronograma (Timeline)</h3>
+                      <button
+                        type="button"
+                        onClick={() => setContent(prev => ({
+                          ...prev,
+                          timeline: [...(prev.timeline || []), { id: Math.random().toString(), step: (prev.timeline?.length || 0) + 1, title: 'Nova Etapa', description: 'Descrição da etapa', duration: 'X dias' }]
+                        }))}
+                        className="text-xs text-brand-600 font-bold hover:text-brand-800 flex items-center gap-1"
+                      >
+                        <Plus size={14} /> Adicionar Etapa
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {content.timeline?.map((step, index) => (
+                        <div key={step.id} className="flex gap-3 items-start p-3 bg-slate-50 border border-slate-200 rounded-lg relative group">
+                          <div className="flex bg-white w-6 h-6 rounded-full items-center justify-center border border-slate-200 text-xs font-bold text-slate-500 shrink-0">
+                            {index + 1}
+                          </div>
+                          <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <input
+                              type="text"
+                              className="bg-transparent font-bold text-slate-800 text-sm focus:outline-none focus:border-b border-brand-300"
+                              value={step.title}
+                              placeholder="Título da Etapa"
+                              onChange={e => {
+                                const newTimeline = [...(content.timeline || [])];
+                                newTimeline[index].title = e.target.value;
+                                setContent({ ...content, timeline: newTimeline });
+                              }}
+                            />
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                className="bg-transparent text-xs text-slate-500 focus:outline-none focus:border-b border-brand-300 w-full"
+                                value={step.description}
+                                placeholder="Descrição"
+                                onChange={e => {
+                                  const newTimeline = [...(content.timeline || [])];
+                                  newTimeline[index].description = e.target.value;
+                                  setContent({ ...content, timeline: newTimeline });
+                                }}
+                              />
+                              <input
+                                type="text"
+                                className="bg-transparent text-xs text-brand-600 font-bold focus:outline-none focus:border-b border-brand-300 w-24 text-right"
+                                value={step.duration || ''}
+                                placeholder="Prazo (Ex: 2 dias)"
+                                onChange={e => {
+                                  const newTimeline = [...(content.timeline || [])];
+                                  newTimeline[index].duration = e.target.value;
+                                  setContent({ ...content, timeline: newTimeline });
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setContent(prev => ({
+                              ...prev,
+                              timeline: prev.timeline?.filter(t => t.id !== step.id)
+                            }))}
+                            className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -395,6 +598,21 @@ const CreateQuote: React.FC = () => {
                         <span className="text-xs font-medium">Com Entrada</span>
                       </button>
                     </div>
+
+                    <div className="col-span-1 md:col-span-2 mt-2">
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Prazos de Pagamento (Texto Descritivo)</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: 50% na aprovação e 50% na entrega final"
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-500"
+                        value={option.paymentTerms || ''}
+                        onChange={e => {
+                          const newMethods = [...paymentOptions];
+                          newMethods[index].paymentTerms = e.target.value;
+                          setPaymentOptions(newMethods);
+                        }}
+                      />
+                    </div>
                   </div>
 
                   {option.installments > 1 && (
@@ -432,6 +650,8 @@ const CreateQuote: React.FC = () => {
               </button>
             </div>
           </div>
+
+
 
         </div>
 
@@ -505,39 +725,42 @@ const CreateQuote: React.FC = () => {
           </div>
         </div>
 
-      </div>
+      </div >
       {/* Service Selection Modal */}
-      {showServiceModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-slate-900">Importar Serviço</h3>
-              <button onClick={() => setShowServiceModal(false)}><Trash2 size={20} className="text-slate-400 rotate-45" /></button>
-            </div>
+      {
+        showServiceModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 max-h-[80vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-slate-900">Importar Serviço</h3>
+                <button onClick={() => setShowServiceModal(false)}><Trash2 size={20} className="text-slate-400 rotate-45" /></button>
+              </div>
 
-            <div className="space-y-2">
-              {availableServices.length === 0 ? (
-                <p className="text-center text-slate-400 py-8">Nenhum serviço salvo.</p>
-              ) : (
-                availableServices.map(service => (
-                  <button
-                    key={service.id}
-                    onClick={() => addServiceItem(service)}
-                    className="w-full text-left p-3 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all group"
-                  >
-                    <div className="flex justify-between items-start">
-                      <span className="font-medium text-slate-800">{service.description}</span>
-                      <span className="font-semibold text-brand-600">{formatCurrency(service.amount)}</span>
-                    </div>
-                    <span className="text-[10px] text-slate-400 uppercase">{service.type === ItemType.RECURRING ? 'Mensal' : 'Único'}</span>
-                  </button>
-                ))
-              )}
+              <div className="space-y-2">
+                {availableServices.length === 0 ? (
+                  <p className="text-center text-slate-400 py-8">Nenhum serviço salvo.</p>
+                ) : (
+                  availableServices.map(service => (
+                    <button
+                      key={service.id}
+                      onClick={() => addServiceItem(service)}
+                      className="w-full text-left p-3 rounded-lg hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all group"
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className="font-medium text-slate-800">{service.description}</span>
+                        <span className="font-semibold text-brand-600">{formatCurrency(service.amount)}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 uppercase">{service.type === ItemType.RECURRING ? 'Mensal' : 'Único'}</span>
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
+
   );
 };
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Share2, Printer, Pencil, Building2, Calendar, Clock, CheckCircle2, Copy, ThumbsUp, X } from 'lucide-react';
+import { Share2, Printer, Pencil, Building2, Calendar, Clock, CheckCircle2, Copy, ThumbsUp, X, FileText } from 'lucide-react';
 import { Quote, ItemType, PaymentMethod } from '../types';
 import { getQuote, updateQuoteStatus } from '../services/quoteService';
 import { getAllPaymentMethods } from '../services/paymentService';
@@ -77,13 +77,11 @@ const ViewQuote: React.FC = () => {
   }
 
   // Calculations
-  const subtotalOneTime = quote.items
-    .filter(i => i.type === ItemType.ONE_TIME)
-    .reduce((acc, curr) => acc + curr.amount, 0);
+  const oneTimeItems = quote.items.filter(i => i.type === ItemType.ONE_TIME);
+  const recurringItems = quote.items.filter(i => i.type === ItemType.RECURRING);
 
-  const subtotalRecurring = quote.items
-    .filter(i => i.type === ItemType.RECURRING)
-    .reduce((acc, curr) => acc + curr.amount, 0);
+  const subtotalOneTime = oneTimeItems.reduce((acc, curr) => acc + curr.amount, 0);
+  const subtotalRecurring = recurringItems.reduce((acc, curr) => acc + curr.amount, 0);
 
   // Find method in DB or Legacy
   const paymentMethod =
@@ -177,7 +175,7 @@ const ViewQuote: React.FC = () => {
 
         <div className="p-5 md:p-12">
 
-          {/* Success Banner if Approved */}
+          {/* Success Banner if Approved (Common) */}
           {quote.status === 'APPROVED' && (
             <div className="mb-8 bg-green-50 border border-green-100 rounded-xl p-4 flex items-center gap-4 text-green-800 animate-fade-in">
               <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center text-green-600 shrink-0">
@@ -190,265 +188,465 @@ const ViewQuote: React.FC = () => {
             </div>
           )}
 
-          {/* Header Info */}
-          <div className="flex flex-col md:flex-row justify-between mb-12 gap-8">
-            <div>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Orçamento Para</p>
-              <h2 className="text-3xl font-bold text-slate-900 mb-2">{quote.clientName}</h2>
-              <div className="flex items-center gap-2 text-slate-500 text-sm">
-                <span className="w-4 h-4 flex items-center justify-center bg-slate-100 rounded text-[10px]">✉</span>
-                {quote.clientEmail || 'Email não informado'}
-              </div>
-            </div>
-
-            <div className="bg-slate-50 p-6 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-4">
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Data</p>
-                <p className="font-semibold text-slate-700">{format(parseISO(quote.createdAt), 'dd/MM/yyyy')}</p>
-                {quote.updatedAt && quote.updatedAt !== quote.createdAt && (
-                  <p className="text-[10px] text-slate-400 mt-1">Atualizado: {format(parseISO(quote.updatedAt), 'dd/MM HH:mm')}</p>
-                )}
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Validade</p>
-                <p className="font-semibold text-slate-700">{format(parseISO(quote.validUntil), 'dd/MM/yyyy')}</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Prazo</p>
-                <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
-                  <Clock size={14} className="text-brand-500" />
-                  {quote.productionDays} dias úteis
+          {/* LAYOUT SWITCHER */}
+          {quote.layoutType === 'SIMPLE' ? (
+            /* ================= SIMPLE LAYOUT ================= */
+            <div className="animate-fade-in">
+              {/* Header Info */}
+              <div className="flex flex-col md:flex-row justify-between mb-8 border-b border-slate-100 pb-8 gap-8">
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Cliente</p>
+                  <h2 className="text-2xl font-bold text-slate-900">{quote.clientName}</h2>
+                  <p className="text-slate-500 text-sm mt-1">{quote.clientEmail}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm text-right">
+                  <div>
+                    <p className="text-xs font-bold text-slate-400 uppercase">Data</p>
+                    <p className="text-slate-700">{format(parseISO(quote.createdAt), 'dd/MM/yyyy')}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-400 uppercase">Validade</p>
+                    <p className="text-slate-700">{format(parseISO(quote.validUntil), 'dd/MM/yyyy')}</p>
+                  </div>
+                  <div className="col-span-2 mt-2">
+                    <p className="text-xs font-bold text-slate-400 uppercase">Prazo de Produção</p>
+                    <p className="text-slate-700 font-medium">{quote.productionDays} dias úteis</p>
+                  </div>
                 </div>
               </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Status</p>
-                <p className={`font-semibold ${quote.status === 'APPROVED' ? 'text-green-600' : 'text-brand-600'}`}>
-                  {quote.status === 'APPROVED' ? 'Aprovado' : 'Aguardando'}
-                </p>
-              </div>
-            </div>
-          </div>
 
-          {/* Items Section */}
-          <div className="mb-12">
-            <div className="flex items-center gap-2 mb-6 text-slate-900 font-bold text-lg">
-              <div className="w-8 h-8 rounded bg-brand-100 text-brand-600 flex items-center justify-center">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>
-              </div>
-              Itens do Projeto
-            </div>
 
-            <div className="border border-slate-100 rounded-xl overflow-hidden">
-              {/* Desktop Table */}
-              <table className="hidden md:table w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100 text-xs text-slate-500 uppercase font-medium">
-                    <th className="p-4 font-semibold">Descrição</th>
-                    <th className="p-4 font-semibold text-center">Tipo</th>
-                    <th className="p-4 font-semibold text-right">Valor</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {quote.items.map(item => (
-                    <tr key={item.id} className="group hover:bg-slate-50/50">
-                      <td className="p-5">
-                        <p className="font-medium text-slate-800 text-lg">{item.description}</p>
-                        <p className="text-slate-400 text-sm mt-1">Implementação completa conforme requisitos.</p>
-                      </td>
-                      <td className="p-5 text-center">
-                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${item.type === ItemType.ONE_TIME ? 'bg-cyan-100 text-cyan-700' : 'bg-blue-100 text-blue-700'}`}>
-                          {item.type === ItemType.ONE_TIME ? 'Pagamento Único' : 'Mensal'}
-                        </span>
-                      </td>
-                      <td className="p-5 text-right font-medium text-slate-700">
-                        {formatCurrency(item.amount)}
-                        {item.type === ItemType.RECURRING && <span className="text-slate-400 text-xs ml-1">/mês</span>}
-                      </td>
-                    </tr>
+
+              {/* Items Table */}
+              <div className="mb-10">
+                <h3 className="font-bold text-slate-800 mb-4 uppercase text-xs tracking-wider">Detalhamento Financeiro</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b-2 border-slate-100">
+                        <th className="py-3 text-slate-500 font-medium text-sm pl-4">Descrição</th>
+                        <th className="py-3 text-slate-500 font-medium text-sm text-right pr-4">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {quote.items.map(item => (
+                        <tr key={item.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                          <td className="py-4 pl-4 text-slate-700">
+                            <span className="font-medium">{item.description}</span>
+                            {item.type === ItemType.RECURRING && <span className="ml-2 text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold">RECORRENTE</span>}
+                          </td>
+                          <td className="py-4 pr-4 text-slate-900 font-medium text-right">{formatCurrency(item.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-50">
+                        <td className="py-4 pl-4 text-slate-800 font-bold text-right pt-6">Total do Projeto</td>
+                        <td className="py-4 pr-4 text-slate-900 font-bold text-2xl text-right pt-6">{formatCurrency(totalOneTime)}</td>
+                      </tr>
+                      {subtotalRecurring > 0 && (
+                        <tr className="bg-slate-50">
+                          <td className="py-2 pl-4 text-slate-600 text-right text-sm">Mensalidade</td>
+                          <td className="py-2 pr-4 text-slate-700 font-bold text-lg text-right">{formatCurrency(subtotalRecurring)}/mês</td>
+                        </tr>
+                      )}
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              {/* Investment & Payment Section (Unified) */}
+              <div className="mb-12 grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Left: Investment Hero */}
+                <div className="bg-brand-500 rounded-2xl p-8 text-white relative overflow-hidden flex flex-col justify-between min-h-[300px]">
+                  <div className="absolute top-0 right-0 p-8 opacity-10">
+                    <Building2 size={120} />
+                  </div>
+                  <div>
+                    <h3 className="text-brand-100 uppercase tracking-widest font-semibold text-sm mb-2">Investimento Total</h3>
+                    <p className="text-5xl font-bold mb-4">{formatCurrency(totalOneTime)}</p>
+                    <p className="text-brand-100 text-sm opacity-90 max-w-xs">
+                      Valor referente ao desenvolvimento e entrega completa do projeto conforme escopo detalhado.
+                    </p>
+                  </div>
+                  {discountAmount > 0 && quote.paymentOptions && quote.paymentOptions.length <= 1 && (
+                    <div className="mt-8 bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/20">
+                      <p className="text-sm font-medium mb-1">Desconto Aplicado</p>
+                      <p className="text-2xl font-bold">-{formatCurrency(discountAmount)}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Payment Conditions List */}
+                <div className="bg-slate-50 rounded-2xl p-8 border border-slate-100">
+                  <h3 className="text-slate-900 font-bold text-lg mb-6 flex items-center gap-2">
+                    <Clock size={20} className="text-brand-500" />
+                    Condições de Pagamento
+                  </h3>
+
+                  <div className="space-y-4">
+                    {quote.paymentOptions && quote.paymentOptions.length > 0 ? (
+                      quote.paymentOptions.map((option, index) => {
+                        const method = paymentMethods.find(m => m.id === option.paymentMethodId) || LEGACY_METHODS.find(m => m.id === option.paymentMethodId);
+                        const optionTotal = subtotalOneTime * (1 - option.discountPercent / 100);
+                        const isSelected = selectedOptionId === option.id;
+                        const isReadOnly = quote.status === 'APPROVED';
+
+                        // Terms Description Logic
+                        let termsDescription = '';
+                        if (option.installments === 1) {
+                          termsDescription = 'Pagamento à vista na aprovação.';
+                        } else if (option.hasDownPayment) {
+                          if (option.installments === 2) {
+                            termsDescription = '50% na aprovação + 50% em 30 dias.';
+                          } else {
+                            termsDescription = `1ª parcela na aprovação + ${option.installments - 1}x mensais.`;
+                          }
+                        } else {
+                          termsDescription = '1ª parcela para 30 dias + demais mensais.';
+                        }
+
+                        return (
+                          <div
+                            key={option.id}
+                            onClick={() => !isReadOnly && setSelectedOptionId(option.id)}
+                            className={`p-4 rounded-xl border transition-all cursor-pointer relative ${isSelected
+                              ? 'bg-white border-brand-500 shadow-sm ring-1 ring-brand-500'
+                              : 'bg-white border-slate-200 hover:border-brand-300'
+                              } ${isReadOnly ? 'cursor-default' : ''}`}
+                          >
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="font-bold text-slate-700">
+                                {option.installments === 1 ? 'À Vista / Pix' : `Parcelado ${option.installments}x`}
+                              </span>
+                              <span className="font-bold text-slate-900">{formatCurrency(optionTotal)}</span>
+                            </div>
+                            <div className="text-xs text-slate-500 flex flex-col gap-1 mt-2 pb-1">
+                              {option.discountPercent > 0 && (
+                                <span className="text-green-600 font-medium bg-green-50 px-2 py-0.5 rounded w-fit">
+                                  {option.discountPercent}% de desconto aplicado
+                                </span>
+                              )}
+                              <span className="flex items-center gap-1.5 mt-1">
+                                <Clock size={12} className="text-brand-400" />
+                                {termsDescription}
+                              </span>
+                            </div>
+                            {isSelected && <div className="absolute bottom-4 right-4 text-brand-500"><CheckCircle2 size={18} /></div>}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-slate-500 text-sm">Nenhuma condição de pagamento cadastrada.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          ) : (
+            /* ================= PREMIUM LAYOUT (Existing) ================= */
+            <div className="animate-fade-in">
+              {/* Header Info */}
+              <div className="flex flex-col md:flex-row justify-between mb-12 gap-8">
+                <div>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Orçamento Para</p>
+                  <h2 className="text-3xl font-bold text-slate-900 mb-2">{quote.clientName}</h2>
+                  <div className="flex items-center gap-2 text-slate-500 text-sm">
+                    <span className="w-4 h-4 flex items-center justify-center bg-slate-100 rounded text-[10px]">✉</span>
+                    {quote.clientEmail || 'Email não informado'}
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 p-6 rounded-2xl grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-4">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Data</p>
+                    <p className="font-semibold text-slate-700">{format(parseISO(quote.createdAt), 'dd/MM/yyyy')}</p>
+                    {quote.updatedAt && quote.updatedAt !== quote.createdAt && (
+                      <p className="text-[10px] text-slate-400 mt-1">Atualizado: {format(parseISO(quote.updatedAt), 'dd/MM HH:mm')}</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Validade</p>
+                    <p className="font-semibold text-slate-700">{format(parseISO(quote.validUntil), 'dd/MM/yyyy')}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Prazo</p>
+                    <div className="flex items-center gap-1.5 text-slate-700 font-semibold">
+                      <Clock size={14} className="text-brand-500" />
+                      {quote.productionDays} dias úteis
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Status</p>
+                    <p className={`font-semibold ${quote.status === 'APPROVED' ? 'text-green-600' : 'text-brand-600'}`}>
+                      {quote.status === 'APPROVED' ? 'Aprovado' : 'Aguardando'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Service Description */}
+              {quote.serviceDescription && (
+                <div className="mb-12">
+                  <div className="flex items-center gap-2 mb-4 text-slate-900 font-bold text-lg">
+                    <div className="w-8 h-8 rounded bg-brand-100 text-brand-600 flex items-center justify-center">
+                      <FileText size={18} />
+                    </div>
+                    O que faremos
+                  </div>
+                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-slate-700 whitespace-pre-wrap leading-relaxed">
+                    {quote.serviceDescription}
+                  </div>
+                </div>
+              )}
+
+              {/* Features Section */}
+              {quote.content?.features && quote.content.features.length > 0 && (
+                <div className="mb-12">
+                  <div className="flex items-center gap-2 mb-6 text-slate-900 font-bold text-lg">
+                    <div className="w-8 h-8 rounded bg-brand-100 text-brand-600 flex items-center justify-center">
+                      <CheckCircle2 size={18} />
+                    </div>
+                    O que está incluso
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    {quote.content.features.map((feature, index) => (
+                      <div key={feature.id || index} className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <h4 className="font-bold text-slate-800 mb-1 text-sm">{feature.title}</h4>
+                        <p className="text-xs text-slate-500 leading-relaxed">{feature.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Items Section */}
+              <div className="mb-12">
+                <div className="flex items-center gap-2 mb-6 text-slate-900 font-bold text-lg">
+                  <div className="w-8 h-8 rounded bg-brand-100 text-brand-600 flex items-center justify-center">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>
+                  </div>
+                  Itens do Projeto
+                </div>
+
+                <div className={`grid grid-cols-1 md:grid-cols-${Math.min(oneTimeItems.length, 3)} gap-6`}>
+                  {oneTimeItems.map(item => (
+                    <div key={item.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-brand-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                      <h3 className="font-bold text-slate-900 text-lg mb-2">{item.description}</h3>
+                      <p className="text-slate-500 text-sm leading-relaxed mb-4">
+                        Desenvolvimento e implementação completa com foco em performance e conversão.
+                      </p>
+                      <p className="text-brand-600 font-bold text-xl">{formatCurrency(item.amount)}</p>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-
-              {/* Mobile Cards */}
-              <div className="md:hidden divide-y divide-slate-100">
-                {quote.items.map(item => (
-                  <div key={item.id} className="p-5">
-                    <div className="flex justify-between items-start mb-2">
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${item.type === ItemType.ONE_TIME ? 'bg-cyan-100 text-cyan-700' : 'bg-blue-100 text-blue-700'}`}>
-                        {item.type === ItemType.ONE_TIME ? 'Único' : 'Mensal'}
-                      </span>
-                      <p className="font-bold text-slate-900">
-                        {formatCurrency(item.amount)}
-                        {item.type === ItemType.RECURRING && <span className="text-slate-400 text-[10px] ml-0.5">/mês</span>}
-                      </p>
-                    </div>
-                    <p className="font-medium text-slate-800">{item.description}</p>
-                    <p className="text-slate-400 text-xs mt-1">Implementação completa conforme requisitos.</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Footer Section: Payment & Totals */}
-          <div className="flex flex-col lg:flex-row gap-12">
-
-            {/* Payment Methods */}
-            <div className="flex-1">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Formas de Pagamento</h3>
-
-              <div className="space-y-4">
-                {quote.paymentOptions && quote.paymentOptions.length > 0 ? (
-                  quote.paymentOptions.map((option, index) => {
-                    const method = paymentMethods.find(m => m.id === option.paymentMethodId) || LEGACY_METHODS.find(m => m.id === option.paymentMethodId);
-                    const optionTotal = subtotalOneTime * (1 - option.discountPercent / 100);
-
-                    const optionLetter = String.fromCharCode(65 + index); // A, B, C...
-                    const optionSuffix = option.discountPercent > 0
-                      ? `À Vista com ${option.discountPercent}% de Desconto`
-                      : option.installments > 1
-                        ? 'Parcelado'
-                        : 'À Vista';
-
-                    const isSelected = selectedOptionId === option.id;
-                    const isReadOnly = quote.status === 'APPROVED';
-
-                    return (
-                      <div
-                        key={option.id}
-                        onClick={() => !isReadOnly && setSelectedOptionId(option.id)}
-                        className={`bg-slate-50 border rounded-2xl p-5 transition-all group relative cursor-pointer ${isSelected
-                            ? 'border-brand-500 ring-2 ring-brand-500/10 bg-white'
-                            : 'border-slate-100 hover:border-brand-200'
-                          } ${isReadOnly ? 'cursor-default' : ''}`}
-                      >
-                        {isSelected && (
-                          <div className="absolute -top-3 -right-3 w-8 h-8 bg-brand-500 text-white rounded-full flex items-center justify-center shadow-lg border-4 border-white">
-                            <CheckCircle2 size={16} />
-                          </div>
-                        )}
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="flex gap-3">
-                            <div className="w-10 h-10 bg-white rounded-lg shadow-sm flex items-center justify-center text-brand-600">
-                              <Building2 size={20} />
-                            </div>
-                            <div>
-                              <p className="font-bold text-slate-800">Opção {optionLetter} - {optionSuffix}</p>
-                              <p className="text-brand-600 text-xs font-medium">
-                                {method?.name || 'Forma de Pagamento'}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-[10px] text-slate-400 uppercase font-bold">Total</p>
-                            <p className="text-lg font-bold text-slate-900">{formatCurrency(optionTotal)}</p>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-3 border-t border-slate-100 border-dashed">
-                          <div>
-                            <p className="text-[10px] text-slate-400 uppercase font-bold mb-0.5">Parcelamento</p>
-                            <p className="text-sm font-semibold text-slate-700">{option.installments === 1 ? 'À vista' : `${option.installments}x`}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-slate-400 uppercase font-bold mb-0.5">Valor Parcela</p>
-                            <p className="text-sm font-semibold text-slate-700">
-                              {formatCurrency(optionTotal / option.installments)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {option.installments > 1 && (
-                          <div className="mt-2 flex items-center gap-1.5 text-xs text-slate-500 bg-white/50 p-2 rounded-lg border border-slate-50">
-                            <Clock size={12} className="text-slate-400" />
-                            {option.hasDownPayment
-                              ? `Entrada de ${formatCurrency(optionTotal / option.installments)} + ${option.installments - 1} parcelas.`
-                              : `Total dividido em ${option.installments} parcelas mensais.`
-                            }
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex items-center gap-4">
-                    <div className="w-12 h-12 bg-white rounded-lg shadow-sm flex items-center justify-center text-brand-600">
-                      <Building2 size={24} />
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-800">{paymentMethod.name.split('(')[0]}</p>
-                      <p className="text-brand-600 text-sm font-medium">
-                        {paymentMethod.discountPercent > 0 ? `${paymentMethod.discountPercent}% de desconto aplicado` : 'Sem desconto adicional'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-8">
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Observações</h3>
-                <p className="text-slate-500 text-sm leading-relaxed">
-                  O início do projeto se dá após a confirmação do pagamento da primeira parcela (ou valor integral).
-                  Valores de recorrência serão cobrados via boleto bancário mensalmente.
-                </p>
-              </div>
-            </div>
-
-            {/* Totals Box */}
-            <div className="w-full lg:w-96">
-              <div className="bg-slate-50 rounded-2xl p-6 mb-4">
-                <div className="space-y-3 mb-6">
-                  <div className="flex justify-between text-slate-500 text-sm">
-                    <span>Subtotal (Itens Únicos)</span>
-                    <span>{formatCurrency(subtotalOneTime)}</span>
-                  </div>
-                  {subtotalRecurring > 0 && (
-                    <div className="flex justify-between text-slate-500 text-sm">
-                      <span>Mensalidade</span>
-                      <span>{formatCurrency(subtotalRecurring)}</span>
-                    </div>
-                  )}
-                  {quote.paymentOptions && quote.paymentOptions.length > 1 ? (
-                    <div className="flex justify-between text-slate-500 text-sm italic">
-                      <span>Múltiplas opções disponíveis</span>
-                    </div>
-                  ) : (
-                    discountAmount > 0 && (
-                      <div className="flex justify-between text-brand-600 text-sm font-medium">
-                        <span>Desconto</span>
-                        <span>- {formatCurrency(discountAmount)}</span>
-                      </div>
-                    )
-                  )}
-                </div>
-
-                <div className="border-t border-slate-200 pt-6">
-                  <div className="flex justify-between items-end mb-1">
-                    <span className="font-bold text-slate-900 text-lg">
-                      {quote.paymentOptions && quote.paymentOptions.length > 1 ? 'Total (Base)' : 'Total do Pedido'}
-                    </span>
-                    <span className="font-bold text-slate-900 text-3xl">
-                      {quote.paymentOptions && quote.paymentOptions.length > 1 ? formatCurrency(subtotalOneTime) : formatCurrency(totalOneTime)}
-                    </span>
-                  </div>
-                  {subtotalRecurring > 0 && (
-                    <p className="text-right text-slate-500 text-sm">+ {formatCurrency(subtotalRecurring)} /mês</p>
-                  )}
                 </div>
               </div>
 
-              {/* ACTION BUTTON FOR CLIENT */}
-              {quote.status !== 'APPROVED' && (
-                <button
-                  onClick={handleAcceptClick}
-                  disabled={isAccepting}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 transition-all transform hover:scale-[1.02] flex justify-center items-center gap-2 no-print"
-                >
-                  <ThumbsUp size={20} /> Aprovar Orçamento
-                </button>
+              {/* Timeline Section */}
+              {quote.content?.timeline && quote.content.timeline.length > 0 && (
+                <div className="mb-20">
+                  <div className="flex items-center gap-2 mb-8 text-slate-900 font-bold text-lg">
+                    <div className="w-8 h-8 rounded bg-brand-100 text-brand-600 flex items-center justify-center">
+                      <Calendar size={18} />
+                    </div>
+                    Etapas, Entregas e Prazo
+                  </div>
+
+                  <div className="relative max-w-4xl mx-auto">
+                    {/* Desktop Center Line */}
+                    <div className="hidden md:block absolute left-1/2 top-0 bottom-0 w-px bg-slate-200 -translate-x-px"></div>
+                    {/* Mobile Left Line */}
+                    <div className="md:hidden absolute left-[19px] top-0 bottom-0 w-px bg-slate-200"></div>
+
+                    <div className="space-y-8 md:space-y-12">
+                      {quote.content.timeline.map((step, index) => {
+                        const isEven = index % 2 === 0;
+                        return (
+                          <div key={step.id || index} className={`relative flex flex-col md:flex-row items-start md:items-center ${isEven ? '' : 'md:flex-row-reverse'}`}>
+
+                            {/* Item Content */}
+                            <div className={`pl-14 md:pl-0 md:w-[45%] relative ${isEven ? 'md:text-right md:pr-12' : 'md:text-left md:pl-12'}`}>
+                              {/* Mobile Marker (Absolute) */}
+                              <div className={`md:hidden absolute left-0 top-0 w-10 h-10 rounded-xl bg-white border-2 border-slate-200 flex items-center justify-center font-bold text-slate-600 shadow-sm z-10`}>
+                                {index + 1}
+                              </div>
+
+                              <div>
+                                <h4 className="font-bold text-slate-900 text-lg md:text-xl mb-1">{step.title}</h4>
+                                <p className="text-sm text-slate-500 leading-relaxed mb-2">{step.description}</p>
+                                {step.duration && (
+                                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-brand-50 text-brand-700 text-xs font-bold border border-brand-100 ${isEven ? 'md:flex-row-reverse' : ''}`}>
+                                    <Clock size={12} /> {step.duration}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Desktop Center Marker */}
+                            <div className="hidden md:flex w-[10%] justify-center relative z-10">
+                              <div className="w-12 h-12 rounded-xl bg-white border-2 border-slate-200 flex items-center justify-center font-bold text-slate-600 text-lg shadow-sm">
+                                {index + 1}
+                              </div>
+                            </div>
+
+                            {/* Empty Space for Balance */}
+                            <div className="hidden md:block md:w-[45%]"></div>
+
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Investment & Payment Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+
+                {/* Left: Investment Hero */}
+                <div className="bg-brand-500 rounded-2xl p-8 text-white relative overflow-hidden flex flex-col justify-between min-h-[300px]">
+                  <div className="absolute top-0 right-0 p-8 opacity-10">
+                    <Building2 size={120} />
+                  </div>
+                  <div>
+                    <h3 className="text-brand-100 uppercase tracking-widest font-semibold text-sm mb-2">Investimento Total</h3>
+                    <p className="text-5xl font-bold mb-4">
+                      {(() => {
+                        const selectedOption = quote.paymentOptions?.find(o => o.id === selectedOptionId);
+                        const finalTotal = selectedOption
+                          ? subtotalOneTime * (1 - selectedOption.discountPercent / 100)
+                          : totalOneTime;
+                        return formatCurrency(finalTotal);
+                      })()}
+                    </p>
+                    <p className="text-brand-100 text-sm opacity-90 max-w-xs">
+                      Valor referente ao desenvolvimento e entrega completa do projeto conforme escopo detalhado.
+                    </p>
+                  </div>
+
+                  {(() => {
+                    const selectedOption = quote.paymentOptions?.find(o => o.id === selectedOptionId);
+                    const currentDiscountPercent = selectedOption?.discountPercent || 0;
+                    const currentDiscountAmount = currentDiscountPercent > 0
+                      ? subtotalOneTime * (currentDiscountPercent / 100)
+                      : 0;
+
+                    if (currentDiscountAmount > 0) {
+                      return (
+                        <div className="mt-8 bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/20">
+                          <p className="text-sm font-medium mb-1">Desconto Aplicado ({currentDiscountPercent}%)</p>
+                          <p className="text-2xl font-bold">-{formatCurrency(currentDiscountAmount)}</p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+
+                {/* Right: Payment Conditions List */}
+                <div className="bg-slate-50 rounded-2xl p-8 border border-slate-100">
+                  <h3 className="text-slate-900 font-bold text-lg mb-6 flex items-center gap-2">
+                    <Clock size={20} className="text-brand-500" />
+                    Condições de Pagamento
+                  </h3>
+
+                  <div className="space-y-4">
+                    {quote.paymentOptions && quote.paymentOptions.length > 0 ? (
+                      quote.paymentOptions.map((option, index) => {
+                        const method = paymentMethods.find(m => m.id === option.paymentMethodId) || LEGACY_METHODS.find(m => m.id === option.paymentMethodId);
+                        const optionTotal = subtotalOneTime * (1 - option.discountPercent / 100);
+                        const isSelected = selectedOptionId === option.id;
+                        const isReadOnly = quote.status === 'APPROVED';
+
+                        // Terms Description Logic
+                        let termsDescription = '';
+                        if (option.installments === 1) {
+                          termsDescription = 'Pagamento à vista na aprovação.';
+                        } else if (option.hasDownPayment) {
+                          if (option.installments === 2) {
+                            termsDescription = '50% na aprovação + 50% em 30 dias.';
+                          } else {
+                            termsDescription = `1ª parcela na aprovação + ${option.installments - 1}x mensais.`;
+                          }
+                        } else {
+                          termsDescription = '1ª parcela para 30 dias + demais mensais.';
+                        }
+
+                        return (
+                          <div
+                            key={option.id}
+                            onClick={() => !isReadOnly && setSelectedOptionId(option.id)}
+                            className={`p-4 rounded-xl border transition-all cursor-pointer relative ${isSelected
+                              ? 'bg-white border-brand-500 shadow-sm ring-1 ring-brand-500'
+                              : 'bg-white border-slate-200 hover:border-brand-300'
+                              } ${isReadOnly ? 'cursor-default' : ''}`}
+                          >
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="font-bold text-slate-700">
+                                {option.installments === 1 ? 'À Vista / Pix' : `Parcelado ${option.installments}x`}
+                              </span>
+                              <span className="font-bold text-slate-900">{formatCurrency(optionTotal)}</span>
+                            </div>
+                            <div className="text-xs text-slate-500 flex flex-col gap-1 mt-2 pb-1">
+                              {option.discountPercent > 0 && (
+                                <span className="text-green-600 font-medium bg-green-50 px-2 py-0.5 rounded w-fit">
+                                  {option.discountPercent}% de desconto aplicado
+                                </span>
+                              )}
+                              <span className="flex items-center gap-1.5 mt-1">
+                                <Clock size={12} className="text-brand-400" />
+                                {termsDescription}
+                              </span>
+                            </div>
+                            {isSelected && <div className="absolute bottom-4 right-4 text-brand-500"><CheckCircle2 size={18} /></div>}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-slate-500 text-sm">Nenhuma condição de pagamento cadastrada.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Recurring / Maintenance Section */}
+              {recurringItems.length > 0 && (
+                <div className="mb-12 pt-12 border-t border-slate-100">
+                  <h3 className="text-2xl font-bold text-slate-900 mb-6">Manutenção & Recorrência</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {recurringItems.map(item => (
+                      <div key={item.id} className="border border-slate-200 rounded-xl p-6 flex justify-between items-center hover:border-brand-300 transition-colors bg-white">
+                        <div>
+                          <h4 className="font-bold text-slate-800">{item.description}</h4>
+                          <p className="text-xs text-slate-500 mt-1">Cobrança mensal via boleto/pix</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-lg text-slate-900">{formatCurrency(item.amount)}</p>
+                          <span className="text-[10px] text-slate-400 uppercase">Mensal</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
-          </div>
+          )}
+
+          {/* Action Button (Common) */}
+          {quote.status !== 'APPROVED' && (
+            <div className="flex justify-end pt-8 border-t border-slate-100">
+              <button
+                onClick={handleAcceptClick}
+                disabled={isAccepting}
+                className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-12 rounded-xl shadow-lg shadow-green-600/20 transition-all transform hover:scale-[1.02] flex justify-center items-center gap-2 no-print text-lg"
+              >
+                <ThumbsUp size={22} /> Aprovar Proposta
+              </button>
+            </div>
+          )}
+
         </div>
       </div>
 
