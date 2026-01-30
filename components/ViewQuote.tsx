@@ -506,13 +506,14 @@ const ViewQuote: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
 
                 {/* Left: Investment Hero */}
+                {/* Left: Investment Hero */}
                 <div className="bg-brand-500 rounded-2xl p-8 text-white relative overflow-hidden flex flex-col justify-between min-h-[300px]">
                   <div className="absolute top-0 right-0 p-8 opacity-10">
                     <Building2 size={120} />
                   </div>
                   <div>
                     <h3 className="text-brand-100 uppercase tracking-widest font-semibold text-sm mb-2">Investimento Total</h3>
-                    <p className="text-5xl font-bold mb-4">
+                    <p className="text-5xl font-bold mb-2">
                       {(() => {
                         const selectedOption = quote.paymentOptions?.find(o => o.id === selectedOptionId);
                         const finalTotal = selectedOption
@@ -521,6 +522,34 @@ const ViewQuote: React.FC = () => {
                         return formatCurrency(finalTotal);
                       })()}
                     </p>
+
+                    {/* Installments & Recurring Info */}
+                    <div className="flex flex-col gap-1 mb-4">
+                      {(() => {
+                        const selectedOption = quote.paymentOptions?.find(o => o.id === selectedOptionId);
+
+                        // Show installments if applicable
+                        if (selectedOption && selectedOption.installments > 1) {
+                          const finalTotal = subtotalOneTime * (1 - selectedOption.discountPercent / 100);
+                          const installmentValue = finalTotal / selectedOption.installments;
+
+                          return (
+                            <p className="text-white font-medium text-lg bg-white/20 w-fit px-3 py-1 rounded-lg backdrop-blur-sm">
+                              {selectedOption.installments}x de {formatCurrency(installmentValue)}
+                            </p>
+                          );
+                        }
+                        return null;
+                      })()}
+
+                      {subtotalRecurring > 0 && (
+                        <p className="text-brand-100 font-medium flex items-center gap-2">
+                          <span className="text-xl">+ {formatCurrency(subtotalRecurring)}</span>
+                          <span className="text-sm opacity-80 uppercase tracking-wide">Mensal</span>
+                        </p>
+                      )}
+                    </div>
+
                     <p className="text-brand-100 text-sm opacity-90 max-w-xs">
                       Valor referente ao desenvolvimento e entrega completa do projeto conforme escopo detalhado.
                     </p>
