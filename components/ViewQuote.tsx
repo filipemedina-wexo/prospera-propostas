@@ -47,6 +47,9 @@ const ViewQuote: React.FC = () => {
       if (id) {
         const foundQuote = await getQuote(id);
         setQuote(foundQuote);
+        if (foundQuote) {
+          document.title = `Proposta | ${foundQuote.clientName}`;
+        }
         if (foundQuote?.selectedPaymentOptionId) {
           setSelectedOptionId(foundQuote.selectedPaymentOptionId);
         } else if (foundQuote?.paymentOptions?.length) {
