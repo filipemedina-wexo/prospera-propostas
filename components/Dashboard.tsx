@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, Search, ExternalLink, Copy, CheckCircle2, Pencil } from 'lucide-react';
-import { getAllQuotes } from '../services/quoteService';
+import { getAllQuotes, updateQuoteStatus } from '../services/quoteService';
 import { Quote, ItemType } from '../types';
 import { formatCurrency } from './Formatters';
 import { format, parseISO } from 'date-fns';
@@ -140,9 +140,20 @@ const Dashboard: React.FC = () => {
                       {format(parseISO(quote.createdAt), 'dd/MM/yyyy')}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border uppercase tracking-wide ${getStatusColor(quote.status)}`}>
-                        {getStatusLabel(quote.status)}
-                      </span>
+                      <select
+                        className={`text-[10px] font-bold px-2.5 py-1 rounded-full border uppercase tracking-wide cursor-pointer focus:outline-none appearance-none ${getStatusColor(quote.status)}`}
+                        value={quote.status}
+                        onChange={async (e) => {
+                          const newStatus = e.target.value as any;
+                          setQuotes(quotes.map(q => q.id === quote.id ? { ...q, status: newStatus } : q));
+                          await updateQuoteStatus(quote.id, newStatus);
+                        }}
+                      >
+                        <option value="DRAFT">Aguardando</option>
+                        <option value="SENT">Enviado</option>
+                        <option value="APPROVED">Aprovado</option>
+                        <option value="EXPIRED">Expirado</option>
+                      </select>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
@@ -160,15 +171,13 @@ const Dashboard: React.FC = () => {
                         >
                           <ExternalLink size={18} />
                         </Link>
-                        {quote.status !== 'APPROVED' && (
-                          <Link
-                            to={`/edit/${quote.id}`}
-                            className="p-2 hover:bg-slate-100 rounded-lg text-blue-600 transition-colors"
-                            title="Editar"
-                          >
-                            <Pencil size={18} />
-                          </Link>
-                        )}
+                        <Link
+                          to={`/edit/${quote.id}`}
+                          className="p-2 hover:bg-slate-100 rounded-lg text-blue-600 transition-colors"
+                          title="Editar"
+                        >
+                          <Pencil size={18} />
+                        </Link>
                       </div>
                     </td>
                   </tr>
