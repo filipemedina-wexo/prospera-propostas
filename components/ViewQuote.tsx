@@ -461,9 +461,6 @@ const ViewQuote: React.FC = () => {
                       <div key={item.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
                         <div className="absolute top-0 left-0 w-1 h-full bg-brand-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                         <h3 className="font-bold text-slate-900 text-lg mb-2">{item.description}</h3>
-                        <p className="text-slate-500 text-sm leading-relaxed mb-4">
-                          Desenvolvimento e implementação completa com foco em performance e conversão.
-                        </p>
                         <p className="text-brand-600 font-bold text-xl">{formatCurrency(item.amount)}</p>
                       </div>
                     ))}
