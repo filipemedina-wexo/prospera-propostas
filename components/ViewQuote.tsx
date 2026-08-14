@@ -616,19 +616,7 @@ const ViewQuote: React.FC = () => {
                           const isSelected = selectedOptionId === option.id;
                           const isReadOnly = quote.status === 'APPROVED';
 
-                          // Terms Description Logic
-                          let termsDescription = '';
-                          if (option.installments === 1) {
-                            termsDescription = 'Pagamento à vista na aprovação.';
-                          } else if (option.hasDownPayment) {
-                            if (option.installments === 2) {
-                              termsDescription = '50% na aprovação + 50% em 30 dias.';
-                            } else {
-                              termsDescription = `1ª parcela na aprovação + ${option.installments - 1}x mensais.`;
-                            }
-                          } else {
-                            termsDescription = '1ª parcela para 30 dias + demais mensais.';
-                          }
+                          const termsDescription = getPaymentTermsDescription(option);
 
                           return (
                             <div
