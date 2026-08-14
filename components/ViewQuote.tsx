@@ -17,6 +17,18 @@ const LEGACY_METHODS: PaymentMethod[] = [
   { id: 'boleto', name: 'Boleto Bancário (Sem desconto)', discountPercent: 0 },
 ];
 
+const getPaymentTermsDescription = (option: PaymentOption) => {
+  if (option.paymentTerms?.trim()) return option.paymentTerms.trim();
+
+  if (option.installments === 1) return 'Pagamento à vista na aprovação.';
+  if (option.hasDownPayment) {
+    return option.installments === 2
+      ? '50% na aprovação + 50% em 30 dias.'
+      : `1ª parcela na aprovação + ${option.installments - 1}x mensais.`;
+  }
+  return '1ª parcela para 30 dias + demais mensais.';
+};
+
 const ViewQuote: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -94,6 +106,13 @@ const ViewQuote: React.FC = () => {
 
   const discountAmount = (subtotalOneTime * paymentMethod.discountPercent) / 100;
   const totalOneTime = subtotalOneTime - discountAmount;
+  const selectedPaymentOption = quote.paymentOptions?.find(option => option.id === selectedOptionId);
+  const selectedPaymentTotal = selectedPaymentOption
+    ? subtotalOneTime * (1 - selectedPaymentOption.discountPercent / 100)
+    : totalOneTime;
+  const selectedPaymentDiscount = selectedPaymentOption
+    ? subtotalOneTime - selectedPaymentTotal
+    : discountAmount;
 
   const handlePrint = () => {
     window.print();
@@ -110,6 +129,8 @@ const ViewQuote: React.FC = () => {
 
   const handleAcceptClick = () => {
     setShowModal(true);
+    // Scroll to top to ensure modal is visible if it's positioned absolutely or just for better UX
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleConfirmAccept = async () => {
@@ -268,15 +289,27 @@ const ViewQuote: React.FC = () => {
                     </div>
                     <div>
                       <h3 className="text-brand-100 uppercase tracking-widest font-semibold text-sm mb-2">Investimento Total</h3>
-                      <p className="text-5xl font-bold mb-4">{formatCurrency(totalOneTime)}</p>
+                      <p className="text-5xl font-bold mb-3">{formatCurrency(selectedPaymentTotal)}</p>
+                      {selectedPaymentOption && (
+                        <div className="mb-5 rounded-xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-brand-100">Condição selecionada</p>
+                          <p className="mt-1 font-bold text-white">
+                            {selectedPaymentOption.installments === 1
+                              ? 'À vista / Pix'
+                              : `${selectedPaymentOption.installments}x de ${formatCurrency(selectedPaymentTotal / selectedPaymentOption.installments)}`}
+                          </p>
+                          <p className="mt-1 text-sm text-brand-100">{getPaymentTermsDescription(selectedPaymentOption)}</p>
+                        </div>
+                      )}
                       <p className="text-brand-100 text-sm opacity-90 max-w-xs">
                         Valor referente ao desenvolvimento e entrega completa do projeto conforme escopo detalhado.
                       </p>
                     </div>
-                    {discountAmount > 0 && quote.paymentOptions && quote.paymentOptions.length <= 1 && (
+                    {selectedPaymentDiscount > 0 && (
                       <div className="mt-8 bg-white/10 backdrop-blur-sm p-4 rounded-xl border border-white/20">
-                        <p className="text-sm font-medium mb-1">Desconto Aplicado</p>
-                        <p className="text-2xl font-bold">-{formatCurrency(discountAmount)}</p>
+                        <p className="text-sm font-medium">{selectedPaymentOption?.discountPercent || paymentMethod.discountPercent}% de desconto aplicado</p>
+                        <p className="mt-1 text-sm text-brand-100 line-through">De {formatCurrency(subtotalOneTime)}</p>
+                        <p className="text-lg font-bold">Por {formatCurrency(selectedPaymentTotal)}</p>
                       </div>
                     )}
                   </div>
@@ -297,19 +330,7 @@ const ViewQuote: React.FC = () => {
                           const isSelected = selectedOptionId === option.id;
                           const isReadOnly = quote.status === 'APPROVED';
 
-                          // Terms Description Logic
-                          let termsDescription = '';
-                          if (option.installments === 1) {
-                            termsDescription = 'Pagamento à vista na aprovação.';
-                          } else if (option.hasDownPayment) {
-                            if (option.installments === 2) {
-                              termsDescription = '50% na aprovação + 50% em 30 dias.';
-                            } else {
-                              termsDescription = `1ª parcela na aprovação + ${option.installments - 1}x mensais.`;
-                            }
-                          } else {
-                            termsDescription = '1ª parcela para 30 dias + demais mensais.';
-                          }
+                          const termsDescription = getPaymentTermsDescription(option);
 
                           return (
                             <div
